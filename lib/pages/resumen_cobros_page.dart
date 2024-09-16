@@ -136,21 +136,18 @@ class ResumenCobrosPage extends StatelessWidget {
   }
 
   Future<List<Transaccion>> _fetchAllTransacciones(BuildContext context) async {
-    TransaccionProvider provider =
-        Provider.of<TransaccionProvider>(context, listen: false);
-
-    final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
     // Implement a method in provider to fetch all transactions
     // For simplicity, assuming there is a method getAllTransacciones
     // Otherwise, you need to implement it
     // Here, we'll fetch all transacciones by iterating through all fairs and stands
     // This is not optimal and should be optimized based on actual data structure
     List<Transaccion> allTransacciones = [];
-    QuerySnapshot fairsSnapshot = await _firestore.collection('fairs').get();
+    QuerySnapshot fairsSnapshot = await firestore.collection('fairs').get();
 
     for (var feriaDoc in fairsSnapshot.docs) {
       String feriaId = feriaDoc['id'];
-      QuerySnapshot standsSnapshot = await _firestore
+      QuerySnapshot standsSnapshot = await firestore
           .collection('fairs')
           .doc(feriaDoc.id)
           .collection('stands')
@@ -164,7 +161,7 @@ class ResumenCobrosPage extends StatelessWidget {
           apellidoResponsable: standDoc['responsibleLastname'],
         );
 
-        QuerySnapshot paymentsSnapshot = await _firestore
+        QuerySnapshot paymentsSnapshot = await firestore
             .collection('fairs')
             .doc(feriaDoc.id)
             .collection('stands')

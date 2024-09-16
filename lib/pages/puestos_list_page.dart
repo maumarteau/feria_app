@@ -40,7 +40,6 @@ class _PuestosListPageState extends State<PuestosListPage> {
   }
 
   void _fetchPuestos() {
-    print(widget.feria.id.toString());
     FirebaseFirestore.instance
         .collection('fairs')
         .doc(widget.feria.id.toString())
@@ -110,10 +109,10 @@ class _PuestosListPageState extends State<PuestosListPage> {
           centerTitle: true,
           elevation: 0,
           backgroundColor: appBarBackground,
-          iconTheme: IconThemeData(color: appBarText),
+          iconTheme: const IconThemeData(color: appBarText),
           actions: [
             PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert, color: appBarText),
+              icon: const Icon(Icons.more_vert, color: appBarText),
               onSelected: (value) {
                 if (value == 'Recorrido') {
                   Navigator.push(

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../models/puesto.dart';
 import '../models/transaccion.dart';
 import '../providers/transaccion_provider.dart';
-import '../theme.dart';
 
 class HistorialPagosPage extends StatelessWidget {
   final String feriaId;

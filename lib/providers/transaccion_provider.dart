@@ -70,7 +70,7 @@ class TransaccionProvider with ChangeNotifier {
       String feriaId, Puesto puesto) async {
     DateTime hoy = DateTime.now();
     DateTime inicioDia = DateTime(hoy.year, hoy.month, hoy.day);
-    DateTime finDia = inicioDia.add(Duration(days: 1));
+    DateTime finDia = inicioDia.add(const Duration(days: 1));
 
     QuerySnapshot feriaSnapshot = await _firestore
         .collection('fairs')

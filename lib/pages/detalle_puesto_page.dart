@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/puesto.dart';
 import '../models/transaccion.dart';
-import '../models/concepto_transaccion.dart';
 import '../providers/transaccion_provider.dart';
 import 'editar_responsable_page.dart';
 import 'historial_pagos_page.dart';
@@ -78,7 +77,7 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
           .collection('concepts')
           .get()
           .then((querySnapshot) {
-        querySnapshot.docs.forEach((doc) {
+        for (var doc in querySnapshot.docs) {
           conceptosAPagar.add(ConceptoPagar(
             id: doc.id,
             name: doc['name'],
@@ -87,7 +86,7 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
             selected: false,
             available: true,
           ));
-        });
+        }
       });
     }
 
@@ -404,10 +403,6 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                       return;
                     }
 
-                    print("************************");
-                    print("******** CONFIRMAR ********");
-                    print("************************");
-
                     TransaccionProvider transaccionProvider =
                         Provider.of<TransaccionProvider>(context,
                             listen: false);
@@ -417,26 +412,16 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
 
                     bool hayCambios = false;
 
-                    print("******** SELECCIONADOS ********");
-
-                    // print(
-                    //     transaccionesActuales.map((t) => t.toJson()).toList());
-
                     for (var conceptoSeleccionado in conceptosSeleccionados) {
-                      // check if exists in transaccionesActuales
                       bool exists = transaccionesActuales
                           .any((t) => t.concepto.id == conceptoSeleccionado.id);
 
-                      // busco tambien si existe en transaccionesAdeudadas
                       if (!exists) {
                         exists = transaccionesAdeudadas.any(
                             (t) => t.concepto.id == conceptoSeleccionado.id);
                       }
 
-                      print(conceptoSeleccionado.name);
                       if (exists) {
-                        // Editar pago existente
-                        print(" ***** EDITAR *****");
                         await transaccionProvider.actualizarTransaccion(
                             widget.feriaId,
                             widget.puesto.id,
@@ -444,8 +429,6 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                             true);
                         hayCambios = true;
                       } else {
-                        // Crear pago nuevo como pagado
-                        print(" ***** NUEVO *****");
                         await transaccionProvider.agregarTransaccion(
                           widget.feriaId,
                           widget.puesto.id,
@@ -458,33 +441,26 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                       }
                     }
 
-                    print("******** NOOOO SELECCIONADOS ********");
                     // Crear pagos nuevos como impagos para los no seleccionados
                     List<ConceptoPagar> conceptosNoSeleccionados =
                         conceptosAPagar.where((c) => !c.selected).toList();
 
                     for (var conceptoNoSeleccionado
                         in conceptosNoSeleccionados) {
-                      print(conceptoNoSeleccionado.name);
-
                       bool exists = transaccionesActuales.any(
                           (t) => t.concepto.id == conceptoNoSeleccionado.id);
-
-                      // busco tambien si existe en transaccionesAdeudadas
                       if (!exists) {
                         exists = transaccionesAdeudadas.any(
                             (t) => t.concepto.id == conceptoNoSeleccionado.id);
                       }
 
                       if (exists) {
-                        print(" ***** EDITAR *****");
                         await transaccionProvider.actualizarTransaccion(
                             widget.feriaId,
                             widget.puesto.id,
                             conceptoNoSeleccionado.id,
                             false);
                       } else {
-                        print(" ***** NUEVO *****");
                         await transaccionProvider.agregarTransaccion(
                           widget.feriaId,
                           widget.puesto.id,

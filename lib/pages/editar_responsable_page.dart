@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import '../models/puesto.dart';
 import '../widgets/input_field.dart';
-import '../theme.dart';
 
 class EditarResponsablePage extends StatefulWidget {
   final Puesto puesto;

@@ -48,7 +48,6 @@ class _FeriaListPageState extends State<FeriaListPage> {
         .snapshots()
         .listen((snapshot) {
       List<Feria> fetchedFerias = snapshot.docs.map((doc) {
-        print(doc);
         return Feria(
           id: doc['id'],
           nombre: doc['name'] ?? '',
@@ -107,7 +106,7 @@ class _FeriaListPageState extends State<FeriaListPage> {
           centerTitle: true,
           elevation: 0,
           backgroundColor: appBarBackground,
-          iconTheme: IconThemeData(color: appBarText),
+          iconTheme: const IconThemeData(color: appBarText),
         ),
         drawer: Drawer(
           child: ListView(
@@ -125,7 +124,7 @@ class _FeriaListPageState extends State<FeriaListPage> {
                   child:
                       Icon(Icons.account_circle, size: 50, color: Colors.grey),
                 ),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: appBarBackground,
                 ),
               ),
