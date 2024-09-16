@@ -4,10 +4,10 @@ import '../providers/transaccion_provider.dart';
 import '../models/transaccion.dart';
 
 class ResumenCobrosPage extends StatelessWidget {
-  final int precioConcepto1 = 130; // Boleto baños químicos
+  final int precioConcepto1 = 130;
   final int precioConcepto2 = 300;
 
-  const ResumenCobrosPage({super.key}); // Boleto de servicios
+  const ResumenCobrosPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +31,9 @@ class ResumenCobrosPage extends StatelessWidget {
             itemBuilder: (context, index) {
               final transaccion = transacciones[index];
               return ExpansionTile(
-                title: Text(transaccion.puesto.nombre),
+                title: Text(
+                  'Feria ID: ${transaccion.feriaId} - ${transaccion.puesto.codigo}',
+                ),
                 subtitle: Text(
                   'Responsable: ${transaccion.puesto.nombreResponsable} ${transaccion.puesto.apellidoResponsable}',
                 ),
@@ -45,8 +47,13 @@ class ResumenCobrosPage extends StatelessWidget {
                     Text(_getEstadoTransaccion(transaccion)),
                     IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () =>
-                          _confirmDelete(context, transaccionProvider, index),
+                      onPressed: () => _confirmDelete(
+                        context,
+                        transaccionProvider,
+                        transaccion.feriaId,
+                        transaccion.puesto.id,
+                        transaccion.fechaCreacion,
+                      ),
                     ),
                   ],
                 ),
@@ -57,17 +64,51 @@ class ResumenCobrosPage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Conceptos Pagados:'),
-                          if (transaccion.conceptosPagados['Baños químicos'] ==
-                              true)
-                            Text(
-                                '- Boleto baños químicos (\$$precioConcepto1)'),
-                          if (transaccion.conceptosPagados['Servicios'] == true)
-                            Text('- Boleto de servicios (\$$precioConcepto2)'),
+                          const Text(
+                            'Conceptos Pagados:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8.0),
+                          ...transaccion.conceptos.map((concepto) {
+                            return Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4.0),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                              child: ListTile(
+                                title: Text(
+                                  concepto.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'Fecha: ${_formatDate(concepto.date)}',
+                                  style: const TextStyle(
+                                    fontSize: 14.0,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                trailing: Text(
+                                  '\$${concepto.amount}',
+                                  style: const TextStyle(
+                                    fontSize: 14.0,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
                           const SizedBox(height: 8.0),
                           Text(
                             'Total Pagado: \$${transaccion.totalPagado}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16.0,
+                            ),
                           ),
                         ],
                       ),
@@ -97,8 +138,8 @@ class ResumenCobrosPage extends StatelessWidget {
     return transaccion.totalPagado > 0 ? Colors.green : Colors.red;
   }
 
-  void _confirmDelete(BuildContext context,
-      TransaccionProvider transaccionProvider, int index) {
+  void _confirmDelete(BuildContext context, TransaccionProvider provider,
+      String feriaId, String puestoId, DateTime fecha) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -116,11 +157,12 @@ class ResumenCobrosPage extends StatelessWidget {
             TextButton(
               child: const Text('Eliminar'),
               onPressed: () {
-                transaccionProvider.eliminarTransaccion(index);
+                provider.eliminarTransaccion(feriaId, puestoId, fecha);
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Cobro eliminado exitosamente.')),
+                    content: Text('Cobro eliminado exitosamente.'),
+                  ),
                 );
               },
             ),
@@ -128,5 +170,9 @@ class ResumenCobrosPage extends StatelessWidget {
         );
       },
     );
+  }
+
+  String _formatDate(DateTime fecha) {
+    return '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
   }
 }

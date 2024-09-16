@@ -42,16 +42,28 @@ class _EditarResponsablePageState extends State<EditarResponsablePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
+            TextFormField(
               controller: _nombreController,
-              decoration:
-                  const InputDecoration(labelText: 'Nombre del Responsable'),
+              decoration: const InputDecoration(
+                labelText: 'Nombre',
+                labelStyle: TextStyle(color: Colors.black),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.black),
+                ),
+                floatingLabelStyle: TextStyle(color: Colors.black),
+              ),
             ),
             const SizedBox(height: 16.0),
-            TextField(
+            TextFormField(
               controller: _apellidoController,
-              decoration:
-                  const InputDecoration(labelText: 'Apellido del Responsable'),
+              decoration: const InputDecoration(
+                labelText: 'Apellido',
+                labelStyle: TextStyle(color: Colors.black),
+                focusedBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.black),
+                ),
+                floatingLabelStyle: TextStyle(color: Colors.black),
+              ),
             ),
             const Spacer(),
             SizedBox(
@@ -71,7 +83,7 @@ class _EditarResponsablePageState extends State<EditarResponsablePage> {
                     context,
                     Puesto(
                       id: widget.puesto.id,
-                      nombre: widget.puesto.nombre,
+                      codigo: widget.puesto.codigo,
                       nombreResponsable: _nombreController.text,
                       apellidoResponsable: _apellidoController.text,
                     ),

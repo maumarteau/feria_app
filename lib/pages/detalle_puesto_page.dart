@@ -1,31 +1,123 @@
+// lib/pages/detalle_puesto_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/puesto.dart';
 import '../models/transaccion.dart';
+import '../models/concepto_transaccion.dart';
 import '../providers/transaccion_provider.dart';
-import 'editar_responsable_page.dart'; // Importa la nueva página
+import 'editar_responsable_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DetallePuestoPage extends StatefulWidget {
   final Puesto puesto;
+  final String feriaId;
 
-  const DetallePuestoPage({super.key, required this.puesto});
+  const DetallePuestoPage({
+    super.key,
+    required this.puesto,
+    required this.feriaId,
+  });
 
   @override
   _DetallePuestoPageState createState() => _DetallePuestoPageState();
 }
 
 class _DetallePuestoPageState extends State<DetallePuestoPage> {
-  bool concepto1 = true; // Concepto 1 inicializado en true
-  bool concepto2 = true; // Concepto 2 inicializado en true
-  int total = 0;
+  List<Transaccion> transaccionesActuales = [];
 
-  final int precioConcepto1 = 130; // Boleto baños químicos
-  final int precioConcepto2 = 300; // Boleto de servicios
+  // Nueva lista para conceptos pagados
+  List<ConceptoPagar> conceptosPagados = [];
+
+  List<ConceptoPagar> conceptosAPagar = [];
+  int total = 0;
 
   @override
   void initState() {
     super.initState();
-    _calcularTotal(); // Calcular el total desde el inicio
+    _cargarTransaccionesActuales();
+  }
+
+  Future<void> _cargarTransaccionesActuales() async {
+    TransaccionProvider transaccionProvider =
+        Provider.of<TransaccionProvider>(context, listen: false);
+    transaccionesActuales = await transaccionProvider.getTransaccionesForToday(
+        widget.feriaId, widget.puesto);
+
+    conceptosAPagar = [];
+    conceptosPagados = [];
+
+    if (transaccionesActuales.isNotEmpty) {
+      for (var transaccion in transaccionesActuales) {
+        for (var c in transaccion.conceptos) {
+          if (c.isPaid) {
+            conceptosPagados.add(ConceptoPagar(
+              id: c.id,
+              name: c.name,
+              amount: c.amount,
+              date: c.date,
+              selected: true,
+              available: false,
+            ));
+          } else {
+            conceptosAPagar.add(ConceptoPagar(
+              id: c.id,
+              name: c.name,
+              amount: c.amount,
+              date: c.date,
+              selected: false,
+              available: true,
+            ));
+          }
+        }
+      }
+    } else {
+      // load conceptosAPagar from Firestore
+      await FirebaseFirestore.instance
+          .collection('fairs')
+          .doc(widget.feriaId)
+          .collection('concepts')
+          .get()
+          .then((querySnapshot) {
+        querySnapshot.docs.forEach((doc) {
+          conceptosAPagar.add(ConceptoPagar(
+            id: doc.id,
+            name: doc['name'],
+            amount: doc['amount'],
+            date: DateTime.now(),
+            selected: false,
+            available: true,
+          ));
+        });
+      });
+    }
+
+    _calcularTotal();
+    setState(() {});
+  }
+
+  void _calcularTotal() {
+    // Sumar los conceptos seleccionados por pagar
+    total = 0;
+    for (var concepto in conceptosAPagar) {
+      if (concepto.selected) {
+        total += concepto.amount;
+      }
+    }
+  }
+
+  int _calcularDeuda() {
+    int deuda = 0;
+    for (var concepto in conceptosAPagar) {
+      if (!concepto.selected) {
+        deuda += concepto.amount;
+      }
+    }
+    // Los conceptosPagados no afectan la deuda
+    return deuda;
+  }
+
+  String _formatDate(DateTime fecha) {
+    return '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
   }
 
   @override
@@ -33,7 +125,7 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
     return Scaffold(
       appBar: AppBar(
         title:
-            Text(widget.puesto.nombre, style: const TextStyle(fontSize: 18.0)),
+            Text(widget.puesto.codigo, style: const TextStyle(fontSize: 18.0)),
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) async {
@@ -66,46 +158,141 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(
-            16.0), // Padding para que el botón no quede pegado a los bordes
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${widget.puesto.nombreResponsable} ${widget.puesto.apellidoResponsable}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Center(
+              child: Text(
+                '${widget.puesto.nombreResponsable} ${widget.puesto.apellidoResponsable}',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
             ),
             const SizedBox(height: 16.0),
-            CheckboxListTile(
-              title: Text('Boleto baños químicos    \$$precioConcepto1'),
-              value: concepto1,
-              onChanged: (value) {
-                setState(() {
-                  concepto1 = value ?? false;
-                  _calcularTotal();
-                });
-              },
+            Expanded(
+              child: ListView(
+                children: [
+                  if (conceptosAPagar.isNotEmpty) ...[
+                    const Text(
+                      'Conceptos a Pagar',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6.0),
+                  ],
+                  ...conceptosAPagar.map((concepto) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4.0),
+                      decoration: BoxDecoration(
+                        color: concepto.selected
+                            ? Colors.green[100]
+                            : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                      child: CheckboxListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12.0, vertical: 8.0),
+                        title: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              concepto.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: concepto.selected
+                                    ? Colors.green
+                                    : Colors.black,
+                              ),
+                            ),
+                            Text(
+                              'Fecha: ${_formatDate(concepto.date)}',
+                              style: TextStyle(
+                                fontSize: 14.0,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                        value: concepto.selected,
+                        onChanged: concepto.available
+                            ? (value) {
+                                setState(() {
+                                  concepto.selected = value ?? false;
+                                  _calcularTotal();
+                                });
+                              }
+                            : null,
+                        secondary: Text(
+                          '\$${concepto.amount}',
+                          style: const TextStyle(
+                            fontSize: 14.0,
+                          ),
+                        ),
+                        activeColor: Colors.blue,
+                        checkColor: Colors.white,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        tileColor: Colors.transparent,
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 16.0),
+
+                  // Nueva sección de Conceptos Pagados
+                  if (conceptosPagados.isNotEmpty) ...[
+                    const Text(
+                      'Conceptos Pagados',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6.0),
+                    ...conceptosPagados.map((concepto) {
+                      return Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4.0),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(10.0),
+                        ),
+                        child: ListTile(
+                          title: Text(
+                            concepto.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Fecha: ${_formatDate(concepto.date)}',
+                            style: TextStyle(
+                              fontSize: 14.0,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          trailing: Text(
+                            '\$${concepto.amount}',
+                            style: const TextStyle(
+                              fontSize: 14.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 16.0),
+                  ],
+                ],
+              ),
             ),
-            CheckboxListTile(
-              title: Text('Boleto de servicios           \$$precioConcepto2'),
-              value: concepto2,
-              onChanged: (value) {
-                setState(() {
-                  concepto2 = value ?? false;
-                  _calcularTotal();
-                });
-              },
-            ),
-            const SizedBox(height: 16.0),
-            Text(
-              'Total a cobrar: \$$total',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            if (!concepto1 || !concepto2) ...[
-              const SizedBox(height: 16.0),
+            if (_calcularDeuda() > 0) ...[
               Container(
-                color: Colors.orangeAccent[400],
                 padding: const EdgeInsets.all(12.0),
+                decoration: BoxDecoration(
+                  color: Colors.orangeAccent[400],
+                  borderRadius:
+                      BorderRadius.circular(8.0), // Bordes redondeados
+                ),
                 child: Row(
                   children: [
                     const Icon(Icons.warning, color: Colors.white),
@@ -114,71 +301,170 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                       child: Text(
                         'Se generará una deuda de \$${_calcularDeuda()}',
                         style: const TextStyle(
-                            color: Color(0xFFFFFFFF), fontSize: 14.0),
+                            color: Colors.white,
+                            fontSize: 14.0,
+                            fontWeight: FontWeight.w500),
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 16.0),
             ],
-            const Spacer(),
-            SizedBox(
-              width: double.infinity, // El botón ocupa todo el ancho disponible
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green, // Color verde para el botón
-                  shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(8.0), // Bordes redondeados
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Total a cobrar:',
+                        style: TextStyle(fontSize: 14), // Texto más pequeño
+                      ),
+                      Text(
+                        '\$$total',
+                        style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold), // Monto más grande
+                      ),
+                    ],
                   ),
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 16.0), // Padding vertical
                 ),
-                child: const Text(
-                  'Confirmar',
-                  style: TextStyle(fontSize: 16.0, color: Color(0xFFFFFFFF)),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12.0, horizontal: 48.0),
+                  ),
+                  child: const Text(
+                    'Confirmar',
+                    style: TextStyle(fontSize: 16.0, color: Colors.white),
+                  ),
+                  onPressed: () async {
+                    if (total == 0 && _calcularDeuda() == 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'No hay conceptos seleccionados para pagar.'),
+                          behavior: SnackBarBehavior.floating,
+                          margin:
+                              EdgeInsets.only(bottom: 10, left: 10, right: 10),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                      return;
+                    }
+
+                    TransaccionProvider transaccionProvider =
+                        Provider.of<TransaccionProvider>(context,
+                            listen: false);
+
+                    List<ConceptoPagar> conceptosSeleccionados =
+                        conceptosAPagar.where((c) => c.selected).toList();
+
+                    bool hayCambios = false;
+
+                    print("******** SELECCIONADOS ********");
+
+                    for (var conceptoSeleccionado in conceptosSeleccionados) {
+                      // check if exists in transaccionesActuales
+                      bool exists = transaccionesActuales.any((t) => t.conceptos
+                          .any((c) => c.id == conceptoSeleccionado.id));
+
+                      print(conceptoSeleccionado.name);
+                      if (exists) {
+                        // Editar pago existente
+                        print(" ***** EDITAR *****");
+                        await transaccionProvider.actualizarTransaccion(
+                            widget.feriaId,
+                            widget.puesto.id,
+                            conceptoSeleccionado.id,
+                            true);
+                        hayCambios = true;
+                      } else {
+                        // Crear pago nuevo como pagado
+                        print(" ***** NUEVO *****");
+                        await transaccionProvider.agregarTransaccion(
+                          widget.feriaId,
+                          widget.puesto.id,
+                          conceptoSeleccionado.name,
+                          conceptoSeleccionado.amount,
+                          true,
+                          conceptoSeleccionado.date,
+                        );
+                        hayCambios = true;
+                      }
+                    }
+
+                    print("******** NOOOO SELECCIONADOS ********");
+                    // Crear pagos nuevos como impagos para los no seleccionados
+                    List<ConceptoPagar> conceptosNoSeleccionados =
+                        conceptosAPagar.where((c) => !c.selected).toList();
+
+                    for (var conceptoNoSeleccionado
+                        in conceptosNoSeleccionados) {
+                      print(conceptoNoSeleccionado.name);
+                      await transaccionProvider.agregarTransaccion(
+                        widget.feriaId,
+                        widget.puesto.id,
+                        conceptoNoSeleccionado.name,
+                        conceptoNoSeleccionado.amount,
+                        false,
+                        conceptoNoSeleccionado.date,
+                      );
+                    }
+
+                    if (hayCambios) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Datos guardados exitosamente'),
+                          behavior: SnackBarBehavior.floating,
+                          margin:
+                              EdgeInsets.only(bottom: 10, left: 10, right: 10),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+
+                      Navigator.pop(context, true);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No hay cambios para actualizar.'),
+                          behavior: SnackBarBehavior.floating,
+                          margin:
+                              EdgeInsets.only(bottom: 10, left: 10, right: 10),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
                 ),
-                onPressed: () {
-                  Transaccion nuevaTransaccion = Transaccion(
-                    puesto: widget.puesto,
-                    asistio: true,
-                    conceptosPagados: {
-                      'Baños químicos': concepto1,
-                      'Servicios': concepto2,
-                    },
-                    totalPagado: total,
-                  );
-
-                  Provider.of<TransaccionProvider>(context, listen: false)
-                      .agregarTransaccion(nuevaTransaccion);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Datos guardados exitosamente')),
-                  );
-
-                  Navigator.pop(context, true);
-                },
-              ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  // Método para calcular el total a pagar
-  void _calcularTotal() {
-    total = 0;
-    if (concepto1) total += precioConcepto1;
-    if (concepto2) total += precioConcepto2;
-  }
+class ConceptoPagar {
+  final String id;
+  final String name;
+  final int amount;
+  final DateTime date;
+  bool selected;
+  bool available;
 
-  // Método para calcular la deuda en caso de que no se seleccionen los conceptos
-  int _calcularDeuda() {
-    int deuda = 0;
-    if (!concepto1) deuda += precioConcepto1;
-    if (!concepto2) deuda += precioConcepto2;
-    return deuda;
-  }
+  ConceptoPagar({
+    required this.id,
+    required this.name,
+    required this.amount,
+    required this.date,
+    this.selected = false,
+    this.available = true,
+  });
 }

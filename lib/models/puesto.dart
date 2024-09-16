@@ -1,29 +1,32 @@
+// lib/models/puesto.dart
 class Puesto {
-  final int id;
-  final String nombre;
-  String? nombreResponsable;
-  String? apellidoResponsable;
+  final String id;
+  final String codigo;
+  String nombreResponsable;
+  String apellidoResponsable;
 
   Puesto({
     required this.id,
-    required this.nombre,
-    this.nombreResponsable,
-    this.apellidoResponsable,
+    required this.codigo,
+    required this.nombreResponsable,
+    required this.apellidoResponsable,
   });
 
   factory Puesto.fromJson(Map<String, dynamic> json) {
     return Puesto(
       id: json['id'],
-      nombre: json['nombre'] ?? '',
-      nombreResponsable: json['nombreResponsable'] ?? '',
-      apellidoResponsable: json['apellidoResponsable'] ?? '',
+      codigo: json['codigo'],
+      nombreResponsable: json['nombreResponsable'],
+      apellidoResponsable: json['apellidoResponsable'],
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'nombre': nombre,
-        'nombreResponsable': nombreResponsable ?? '',
-        'apellidoResponsable': apellidoResponsable ?? '',
-      };
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'codigo': codigo,
+      'nombreResponsable': nombreResponsable,
+      'apellidoResponsable': apellidoResponsable,
+    };
+  }
 }

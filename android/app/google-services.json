@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "352014365303",
+    "project_id": "feria-app-e7307",
+    "storage_bucket": "feria-app-e7307.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:352014365303:android:9e5a05c3a2ee4180bc8c72",
+        "android_client_info": {
+          "package_name": "com.feriaapp.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPWpj8yYQUx96L15k7z1mdqRRIUqtka1o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:352014365303:android:7493a3972c5a973fbc8c72",
+        "android_client_info": {
+          "package_name": "com.feriaapp.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPWpj8yYQUx96L15k7z1mdqRRIUqtka1o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
