@@ -73,37 +73,63 @@ class _RecorridoPageState extends State<RecorridoPage> {
           Expanded(
             child: Center(
               child: Card(
-                elevation: 5,
+                elevation: 0,
                 margin:
                     const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        widget.puestos[_currentPuestoIndex].codigo,
-                        style: const TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold,
+                        'PUESTO',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[800],
                         ),
                       ),
-                      const SizedBox(height: 16.0),
+                      Text(
+                        widget.puestos[_currentPuestoIndex].codigo,
+                        style: const TextStyle(
+                          fontSize: 64,
+                          fontWeight: FontWeight.bold,
+                          height: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 20.0),
                       Text(
                         '${widget.puestos[_currentPuestoIndex].nombreResponsable} ${widget.puestos[_currentPuestoIndex].apellidoResponsable}',
-                        style: const TextStyle(fontSize: 20),
+                        style: const TextStyle(fontSize: 24),
                       ),
-                      const SizedBox(height: 16.0),
+                      const SizedBox(height: 34.0),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(200, 60),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14.0),
+                              ),
+                            ),
                             onPressed: () {
                               _avanzarPuesto();
                             },
-                            child: const Text('Ausente'),
+                            child: const Text('Ausente',
+                                style: TextStyle(fontSize: 18)),
                           ),
                           ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(200, 60),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14.0),
+                              ),
+                            ),
                             onPressed: () {
                               Navigator.push(
                                 context,
@@ -119,10 +145,12 @@ class _RecorridoPageState extends State<RecorridoPage> {
                                 }
                               });
                             },
-                            child: const Text('Cobrar'),
+                            child: const Text('Cobrar',
+                                style: TextStyle(fontSize: 18)),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 100.0),
                     ],
                   ),
                 ),

@@ -8,146 +8,212 @@ import '../models/puesto.dart';
 class TransaccionProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  List<Transaccion> _transacciones = [];
+  TransaccionProvider();
 
-  List<Transaccion> get transacciones => _transacciones;
-
-  TransaccionProvider() {
-    _loadFromFirestore();
-  }
-
-  void _loadFromFirestore() {
-    _firestore.collection('fairs').snapshots().listen((feriaSnapshot) {
-      List<Transaccion> loadedTransacciones = [];
-      for (var feriaDoc in feriaSnapshot.docs) {
-        String feriaId = feriaDoc['id'];
-        // Listen to stands subcollection
-        _firestore
-            .collection('fairs')
-            .doc(feriaDoc.id)
-            .collection('stands')
-            .snapshots()
-            .listen((standSnapshot) {
-          for (var standDoc in standSnapshot.docs) {
-            Puesto puesto = Puesto(
-              id: standDoc['id'],
-              codigo: standDoc['codigo'],
-              nombreResponsable: standDoc['nombreResponsable'],
-              apellidoResponsable: standDoc['apellidoResponsable'],
-            );
-
-            _firestore
-                .collection('fairs')
-                .doc(feriaDoc.id)
-                .collection('stands')
-                .doc(standDoc.id)
-                .collection('payments')
-                .snapshots()
-                .listen((paymentSnapshot) {
-              for (var paymentDoc in paymentSnapshot.docs) {
-                Transaccion transaccion = Transaccion(
-                  id: paymentDoc.id,
-                  feriaId: feriaId,
-                  puesto: puesto,
-                  asistio: paymentDoc['isPaid'],
-                  conceptos: [
-                    ConceptoTransaccion(
-                      id: paymentDoc.id,
-                      name: paymentDoc['concept']['name'],
-                      isPaid: paymentDoc['concept']['isPaid'],
-                      amount: paymentDoc['concept']['amount'],
-                      date: paymentDoc['concept']['date'] != null
-                          ? DateTime.parse(paymentDoc['concept']['date'])
-                          : DateTime.parse(paymentDoc['createdAt']),
-                    ),
-                  ],
-                  totalPagado: paymentDoc['isPaid']
-                      ? paymentDoc['concept']['amount']
-                      : 0,
-                  fechaCreacion: DateTime.parse(paymentDoc['createdAt']),
-                );
-                loadedTransacciones.add(transaccion);
-                notifyListeners();
-              }
-            });
-          }
-        });
-      }
-      _transacciones = loadedTransacciones;
-      notifyListeners();
-    });
-  }
-
-  Future<List<Transaccion>> getTransaccionesForToday(
+  // Filtrar transacciones por stand
+  Future<List<Transaccion>> getTransaccionesByStand(
       String feriaId, Puesto puesto) async {
-    DateTime hoy = DateTime.now();
-    QuerySnapshot query = await _firestore
+    QuerySnapshot feriaSnapshot = await _firestore
         .collection('fairs')
-        .doc(feriaId)
-        .collection('stands')
-        .doc(puesto.id)
-        .collection('payments')
-        .where('createdAt',
-            isGreaterThanOrEqualTo:
-                DateTime(hoy.year, hoy.month, hoy.day).toIso8601String())
-        .where('createdAt',
-            isLessThan:
-                DateTime(hoy.year, hoy.month, hoy.day + 1).toIso8601String())
+        .where('id', isEqualTo: feriaId)
         .get();
 
-    List<Transaccion> transacciones = [];
+    if (feriaSnapshot.docs.isEmpty) return [];
 
-    for (var doc in query.docs) {
-      transacciones.add(Transaccion(
+    var feriaDoc = feriaSnapshot.docs.first;
+
+    QuerySnapshot standSnapshot = await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .where('id', isEqualTo: puesto.id)
+        .get();
+
+    if (standSnapshot.docs.isEmpty) return [];
+
+    var standDoc = standSnapshot.docs.first;
+
+    QuerySnapshot paymentDocs = await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .doc(standDoc.id)
+        .collection('payments')
+        .orderBy('createdAt', descending: true)
+        .get();
+
+    List<Transaccion> transacciones = paymentDocs.docs.map((doc) {
+      return Transaccion(
         id: doc.id,
         feriaId: feriaId,
         puesto: puesto,
         asistio: doc['isPaid'],
-        conceptos: [
-          ConceptoTransaccion(
-            id: doc.id,
-            name: doc['concept']['name'],
-            isPaid: doc['concept']['isPaid'],
-            amount: doc['concept']['amount'],
-            date: doc['concept']['date'] != null
-                ? DateTime.parse(doc['concept']['date'])
-                : DateTime.parse(doc['createdAt']),
-          ),
-        ],
+        concepto: ConceptoTransaccion(
+          id: doc.id,
+          name: doc['concept']['name'],
+          isPaid: doc['concept']['isPaid'],
+          amount: doc['concept']['amount'],
+          date: doc['concept']['date'] != null
+              ? DateTime.parse(doc['concept']['date'])
+              : DateTime.parse(doc['createdAt']),
+        ),
         totalPagado: doc['isPaid'] ? doc['concept']['amount'] : 0,
         fechaCreacion: DateTime.parse(doc['createdAt']),
-      ));
-    }
+      );
+    }).toList();
+
+    return transacciones;
+  }
+
+  // Filtrar transacciones para hoy
+  Future<List<Transaccion>> getTransaccionesForToday(
+      String feriaId, Puesto puesto) async {
+    DateTime hoy = DateTime.now();
+    DateTime inicioDia = DateTime(hoy.year, hoy.month, hoy.day);
+    DateTime finDia = inicioDia.add(Duration(days: 1));
+
+    QuerySnapshot feriaSnapshot = await _firestore
+        .collection('fairs')
+        .where('id', isEqualTo: feriaId)
+        .get();
+
+    if (feriaSnapshot.docs.isEmpty) return [];
+
+    var feriaDoc = feriaSnapshot.docs.first;
+
+    QuerySnapshot standSnapshot = await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .where('id', isEqualTo: puesto.id)
+        .get();
+
+    if (standSnapshot.docs.isEmpty) return [];
+
+    var standDoc = standSnapshot.docs.first;
+
+    QuerySnapshot paymentDocs = await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .doc(standDoc.id)
+        .collection('payments')
+        .where('createdAt', isGreaterThanOrEqualTo: inicioDia.toIso8601String())
+        .where('createdAt', isLessThan: finDia.toIso8601String())
+        .get();
+
+    List<Transaccion> transacciones = paymentDocs.docs.map((doc) {
+      return Transaccion(
+        id: doc.id,
+        feriaId: feriaId,
+        puesto: puesto,
+        asistio: doc['isPaid'],
+        concepto: ConceptoTransaccion(
+          id: doc.id,
+          name: doc['concept']['name'],
+          isPaid: doc['concept']['isPaid'],
+          amount: doc['concept']['amount'],
+          date: doc['concept']['date'] != null
+              ? DateTime.parse(doc['concept']['date'])
+              : DateTime.parse(doc['createdAt']),
+        ),
+        totalPagado: doc['isPaid'] ? doc['concept']['amount'] : 0,
+        fechaCreacion: DateTime.parse(doc['createdAt']),
+      );
+    }).toList();
+
+    return transacciones;
+  }
+
+  // Filtrar transacciones no pagadas y antiguas
+  Future<List<Transaccion>> getTransaccionesUnpaidOld(
+      String feriaId, Puesto puesto) async {
+    DateTime hoy = DateTime.now();
+    DateTime inicioDia = DateTime(hoy.year, hoy.month, hoy.day);
+
+    QuerySnapshot feriaSnapshot = await _firestore
+        .collection('fairs')
+        .where('id', isEqualTo: feriaId)
+        .get();
+
+    if (feriaSnapshot.docs.isEmpty) return [];
+
+    var feriaDoc = feriaSnapshot.docs.first;
+
+    QuerySnapshot standSnapshot = await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .where('id', isEqualTo: puesto.id)
+        .get();
+
+    if (standSnapshot.docs.isEmpty) return [];
+
+    var standDoc = standSnapshot.docs.first;
+
+    QuerySnapshot paymentDocs = await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .doc(standDoc.id)
+        .collection('payments')
+        .where('isPaid', isEqualTo: false)
+        .where('createdAt', isLessThan: inicioDia.toIso8601String())
+        .get();
+
+    List<Transaccion> transacciones = paymentDocs.docs.map((doc) {
+      return Transaccion(
+        id: doc.id,
+        feriaId: feriaId,
+        puesto: puesto,
+        asistio: doc['isPaid'],
+        concepto: ConceptoTransaccion(
+          id: doc.id,
+          name: doc['concept']['name'],
+          isPaid: doc['concept']['isPaid'],
+          amount: doc['concept']['amount'],
+          date: doc['concept']['date'] != null
+              ? DateTime.parse(doc['concept']['date'])
+              : DateTime.parse(doc['createdAt']),
+        ),
+        totalPagado: doc['isPaid'] ? doc['concept']['amount'] : 0,
+        fechaCreacion: DateTime.parse(doc['createdAt']),
+      );
+    }).toList();
 
     return transacciones;
   }
 
   Future<void> agregarTransaccion(String feriaId, String puestoId, String name,
       int amount, bool isPaid, DateTime date) async {
-    CollectionReference ferias = _firestore.collection('fairs');
-    QuerySnapshot feriaSnapshot =
-        await ferias.where('id', isEqualTo: feriaId).get();
+    QuerySnapshot feriaSnapshot = await _firestore
+        .collection('fairs')
+        .where('id', isEqualTo: feriaId)
+        .get();
 
     if (feriaSnapshot.docs.isEmpty) return;
 
     var feriaDoc = feriaSnapshot.docs.first;
 
-    CollectionReference stands = ferias.doc(feriaDoc.id).collection('stands');
-
-    QuerySnapshot standSnapshot =
-        await stands.where('id', isEqualTo: puestoId).get();
+    QuerySnapshot standSnapshot = await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .where('id', isEqualTo: puestoId)
+        .get();
 
     if (standSnapshot.docs.isEmpty) return;
 
     var standDoc = standSnapshot.docs.first;
 
-    CollectionReference payments =
-        stands.doc(standDoc.id).collection('payments');
+    CollectionReference payments = _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .doc(standDoc.id)
+        .collection('payments');
 
-    print(
-        'Adding payment to $feriaId, $puestoId, $name, $amount, $isPaid, $date');
-
-    DocumentReference newPayment = await payments.add({
+    await payments.add({
       'createdAt': DateTime.now().toIso8601String(),
       'concept': {
         'name': name,
@@ -155,25 +221,42 @@ class TransaccionProvider with ChangeNotifier {
         'amount': amount,
         'date': date.toIso8601String(),
       },
-      'amount': amount,
       'isPaid': isPaid,
+      'amount': amount,
       'paidAt': isPaid ? DateTime.now().toIso8601String() : null,
-      'chargedBy': 'system', // replace with actual user if available
+      'chargedBy': 'system', // replace with current user if available
     });
 
-    // Firestore snapshots will handle updating the list
+    // Firestore snapshots would handle updates
   }
 
   Future<void> actualizarTransaccion(String feriaId, String puestoId,
       String transactionId, bool isPaid) async {
-    print('actualizarTransaccion $feriaId, $puestoId, $transactionId, $isPaid');
+    QuerySnapshot feriaSnapshot = await _firestore
+        .collection('fairs')
+        .where('id', isEqualTo: feriaId)
+        .get();
 
-    // Get the payment document from fairs/{feriaId}/stands/{puestoId}/payments/{transactionId}
+    if (feriaSnapshot.docs.isEmpty) return;
+
+    var feriaDoc = feriaSnapshot.docs.first;
+
+    QuerySnapshot standSnapshot = await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .where('id', isEqualTo: puestoId)
+        .get();
+
+    if (standSnapshot.docs.isEmpty) return;
+
+    var standDoc = standSnapshot.docs.first;
+
     DocumentReference paymentDoc = _firestore
         .collection('fairs')
-        .doc(feriaId)
+        .doc(feriaDoc.id)
         .collection('stands')
-        .doc(puestoId)
+        .doc(standDoc.id)
         .collection('payments')
         .doc(transactionId);
 
@@ -185,35 +268,34 @@ class TransaccionProvider with ChangeNotifier {
   }
 
   Future<void> eliminarTransaccion(
-      String feriaId, String puestoId, DateTime fecha) async {
-    CollectionReference ferias = _firestore.collection('fairs');
-    QuerySnapshot feriaSnapshot =
-        await ferias.where('id', isEqualTo: feriaId).get();
+      String feriaId, String puestoId, String transactionId) async {
+    QuerySnapshot feriaSnapshot = await _firestore
+        .collection('fairs')
+        .where('id', isEqualTo: feriaId)
+        .get();
 
     if (feriaSnapshot.docs.isEmpty) return;
 
     var feriaDoc = feriaSnapshot.docs.first;
 
-    CollectionReference stands = ferias.doc(feriaDoc.id).collection('stands');
-
-    QuerySnapshot standSnapshot =
-        await stands.where('id', isEqualTo: puestoId).get();
+    QuerySnapshot standSnapshot = await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .where('id', isEqualTo: puestoId)
+        .get();
 
     if (standSnapshot.docs.isEmpty) return;
 
     var standDoc = standSnapshot.docs.first;
 
-    CollectionReference payments =
-        stands.doc(standDoc.id).collection('payments');
-
-    QuerySnapshot paymentSnapshot = await payments
-        .where('createdAt', isEqualTo: fecha.toIso8601String())
-        .get();
-
-    if (paymentSnapshot.docs.isEmpty) return;
-
-    var paymentDoc = paymentSnapshot.docs.first;
-
-    await payments.doc(paymentDoc.id).delete();
+    await _firestore
+        .collection('fairs')
+        .doc(feriaDoc.id)
+        .collection('stands')
+        .doc(standDoc.id)
+        .collection('payments')
+        .doc(transactionId)
+        .delete();
   }
 }

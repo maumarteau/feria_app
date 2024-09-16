@@ -1,6 +1,7 @@
 // lib/pages/login_page.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../pages/feria_list_page.dart';
 import '../widgets/input_field.dart';
 import '../widgets/primary_button.dart';
@@ -52,6 +53,9 @@ class _LoginPageState extends State<LoginPage> {
           .get();
 
       if (userSnapshot.docs.isNotEmpty) {
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('loggedInUser', username);
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const FeriaListPage()),

@@ -1,7 +1,11 @@
+// lib/pages/resumen_cobros_page.dart
+import 'package:feria_app/models/concepto_transaccion.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Add this line
 import '../providers/transaccion_provider.dart';
 import '../models/transaccion.dart';
+import '../models/puesto.dart';
 
 class ResumenCobrosPage extends StatelessWidget {
   final int precioConcepto1 = 130;
@@ -16,9 +20,18 @@ class ResumenCobrosPage extends StatelessWidget {
         title:
             const Text('Resumen de Cobros', style: TextStyle(fontSize: 18.0)),
       ),
-      body: Consumer<TransaccionProvider>(
-        builder: (context, transaccionProvider, child) {
-          List<Transaccion> transacciones = transaccionProvider.transacciones;
+      body: FutureBuilder<List<Transaccion>>(
+        future: _fetchAllTransacciones(context),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
+            );
+          }
+          List<Transaccion> transacciones = snapshot.data ?? [];
 
           if (transacciones.isEmpty) {
             return const Center(
@@ -49,10 +62,12 @@ class ResumenCobrosPage extends StatelessWidget {
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () => _confirmDelete(
                         context,
-                        transaccionProvider,
-                        transaccion.feriaId,
-                        transaccion.puesto.id,
-                        transaccion.fechaCreacion,
+                        transaccionProvider: Provider.of<TransaccionProvider>(
+                            context,
+                            listen: false),
+                        feriaId: transaccion.feriaId,
+                        puestoId: transaccion.puesto.id,
+                        transactionId: transaccion.id,
                       ),
                     ),
                   ],
@@ -72,36 +87,34 @@ class ResumenCobrosPage extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 8.0),
-                          ...transaccion.conceptos.map((concepto) {
-                            return Container(
-                              margin: const EdgeInsets.symmetric(vertical: 4.0),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8.0),
-                              ),
-                              child: ListTile(
-                                title: Text(
-                                  concepto.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  'Fecha: ${_formatDate(concepto.date)}',
-                                  style: const TextStyle(
-                                    fontSize: 14.0,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                trailing: Text(
-                                  '\$${concepto.amount}',
-                                  style: const TextStyle(
-                                    fontSize: 14.0,
-                                  ),
+                          Container(
+                            margin: const EdgeInsets.symmetric(vertical: 4.0),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                            child: ListTile(
+                              title: Text(
+                                transaccion.concepto.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            );
-                          }),
+                              subtitle: Text(
+                                'Fecha: ${_formatDate(transaccion.concepto.date)}',
+                                style: const TextStyle(
+                                  fontSize: 14.0,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              trailing: Text(
+                                '\$${transaccion.concepto.amount}',
+                                style: const TextStyle(
+                                  fontSize: 14.0,
+                                ),
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 8.0),
                           Text(
                             'Total Pagado: \$${transaccion.totalPagado}',
@@ -122,6 +135,71 @@ class ResumenCobrosPage extends StatelessWidget {
     );
   }
 
+  Future<List<Transaccion>> _fetchAllTransacciones(BuildContext context) async {
+    TransaccionProvider provider =
+        Provider.of<TransaccionProvider>(context, listen: false);
+
+    final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+    // Implement a method in provider to fetch all transactions
+    // For simplicity, assuming there is a method getAllTransacciones
+    // Otherwise, you need to implement it
+    // Here, we'll fetch all transacciones by iterating through all fairs and stands
+    // This is not optimal and should be optimized based on actual data structure
+    List<Transaccion> allTransacciones = [];
+    QuerySnapshot fairsSnapshot = await _firestore.collection('fairs').get();
+
+    for (var feriaDoc in fairsSnapshot.docs) {
+      String feriaId = feriaDoc['id'];
+      QuerySnapshot standsSnapshot = await _firestore
+          .collection('fairs')
+          .doc(feriaDoc.id)
+          .collection('stands')
+          .get();
+
+      for (var standDoc in standsSnapshot.docs) {
+        Puesto puesto = Puesto(
+          id: standDoc['id'],
+          codigo: standDoc['code'],
+          nombreResponsable: standDoc['responsibleName'],
+          apellidoResponsable: standDoc['responsibleLastname'],
+        );
+
+        QuerySnapshot paymentsSnapshot = await _firestore
+            .collection('fairs')
+            .doc(feriaDoc.id)
+            .collection('stands')
+            .doc(standDoc.id)
+            .collection('payments')
+            .orderBy('createdAt', descending: true)
+            .get();
+
+        for (var paymentDoc in paymentsSnapshot.docs) {
+          Transaccion transaccion = Transaccion(
+            id: paymentDoc.id,
+            feriaId: feriaId,
+            puesto: puesto,
+            asistio: paymentDoc['isPaid'],
+            concepto: ConceptoTransaccion(
+              id: paymentDoc.id,
+              name: paymentDoc['concept']['name'],
+              isPaid: paymentDoc['concept']['isPaid'],
+              amount: paymentDoc['concept']['amount'],
+              date: paymentDoc['concept']['date'] != null
+                  ? DateTime.parse(paymentDoc['concept']['date'])
+                  : DateTime.parse(paymentDoc['createdAt']),
+            ),
+            totalPagado:
+                paymentDoc['isPaid'] ? paymentDoc['concept']['amount'] : 0,
+            fechaCreacion: DateTime.parse(paymentDoc['createdAt']),
+          );
+          allTransacciones.add(transaccion);
+        }
+      }
+    }
+
+    return allTransacciones;
+  }
+
   String _getEstadoTransaccion(Transaccion transaccion) {
     if (!transaccion.asistio) return 'No Asistió';
     if (transaccion.totalPagado > 0) return 'Pagó \$${transaccion.totalPagado}';
@@ -138,8 +216,11 @@ class ResumenCobrosPage extends StatelessWidget {
     return transaccion.totalPagado > 0 ? Colors.green : Colors.red;
   }
 
-  void _confirmDelete(BuildContext context, TransaccionProvider provider,
-      String feriaId, String puestoId, DateTime fecha) {
+  void _confirmDelete(BuildContext context,
+      {required TransaccionProvider transaccionProvider,
+      required String feriaId,
+      required String puestoId,
+      required String transactionId}) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -156,8 +237,9 @@ class ResumenCobrosPage extends StatelessWidget {
             ),
             TextButton(
               child: const Text('Eliminar'),
-              onPressed: () {
-                provider.eliminarTransaccion(feriaId, puestoId, fecha);
+              onPressed: () async {
+                await transaccionProvider.eliminarTransaccion(
+                    feriaId, puestoId, transactionId);
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(

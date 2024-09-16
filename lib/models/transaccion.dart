@@ -7,7 +7,7 @@ class Transaccion {
   final String feriaId;
   final Puesto puesto;
   bool asistio;
-  List<ConceptoTransaccion> conceptos;
+  ConceptoTransaccion concepto;
   int totalPagado;
   DateTime fechaCreacion;
 
@@ -16,7 +16,7 @@ class Transaccion {
     required this.feriaId,
     required this.puesto,
     required this.asistio,
-    required this.conceptos,
+    required this.concepto,
     required this.totalPagado,
     required this.fechaCreacion,
   });
@@ -27,9 +27,7 @@ class Transaccion {
       feriaId: json['feriaId'],
       puesto: Puesto.fromJson(json['puesto']),
       asistio: json['asistio'],
-      conceptos: (json['conceptos'] as List)
-          .map((c) => ConceptoTransaccion.fromJson(c))
-          .toList(),
+      concepto: ConceptoTransaccion.fromJson(json['concepto']),
       totalPagado: json['totalPagado'],
       fechaCreacion: DateTime.parse(json['fechaCreacion']),
     );
@@ -41,7 +39,7 @@ class Transaccion {
       'feriaId': feriaId,
       'puesto': puesto.toJson(),
       'asistio': asistio,
-      'conceptos': conceptos.map((c) => c.toJson()).toList(),
+      'concepto': concepto.toJson(),
       'totalPagado': totalPagado,
       'fechaCreacion': fechaCreacion.toIso8601String(),
     };

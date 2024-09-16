@@ -1,5 +1,8 @@
+// lib/pages/editar_responsable_page.dart
 import 'package:flutter/material.dart';
 import '../models/puesto.dart';
+import '../widgets/input_field.dart';
+import '../theme.dart';
 
 class EditarResponsablePage extends StatefulWidget {
   final Puesto puesto;
@@ -42,28 +45,14 @@ class _EditarResponsablePageState extends State<EditarResponsablePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextFormField(
+            InputField(
+              hintText: 'Nombre',
               controller: _nombreController,
-              decoration: const InputDecoration(
-                labelText: 'Nombre',
-                labelStyle: TextStyle(color: Colors.black),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Colors.black),
-                ),
-                floatingLabelStyle: TextStyle(color: Colors.black),
-              ),
             ),
             const SizedBox(height: 16.0),
-            TextFormField(
+            InputField(
+              hintText: 'Apellido',
               controller: _apellidoController,
-              decoration: const InputDecoration(
-                labelText: 'Apellido',
-                labelStyle: TextStyle(color: Colors.black),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Colors.black),
-                ),
-                floatingLabelStyle: TextStyle(color: Colors.black),
-              ),
             ),
             const Spacer(),
             SizedBox(

@@ -6,6 +6,7 @@ import '../models/transaccion.dart';
 import '../models/concepto_transaccion.dart';
 import '../providers/transaccion_provider.dart';
 import 'editar_responsable_page.dart';
+import 'historial_pagos_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DetallePuestoPage extends StatefulWidget {
@@ -24,6 +25,7 @@ class DetallePuestoPage extends StatefulWidget {
 
 class _DetallePuestoPageState extends State<DetallePuestoPage> {
   List<Transaccion> transaccionesActuales = [];
+  List<Transaccion> transaccionesAdeudadas = [];
 
   // Nueva lista para conceptos pagados
   List<ConceptoPagar> conceptosPagados = [];
@@ -34,6 +36,9 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
   @override
   void initState() {
     super.initState();
+    conceptosAPagar = [];
+    conceptosPagados = [];
+    _cargarTransaccionesImpagas();
     _cargarTransaccionesActuales();
   }
 
@@ -43,31 +48,26 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
     transaccionesActuales = await transaccionProvider.getTransaccionesForToday(
         widget.feriaId, widget.puesto);
 
-    conceptosAPagar = [];
-    conceptosPagados = [];
-
     if (transaccionesActuales.isNotEmpty) {
       for (var transaccion in transaccionesActuales) {
-        for (var c in transaccion.conceptos) {
-          if (c.isPaid) {
-            conceptosPagados.add(ConceptoPagar(
-              id: c.id,
-              name: c.name,
-              amount: c.amount,
-              date: c.date,
-              selected: true,
-              available: false,
-            ));
-          } else {
-            conceptosAPagar.add(ConceptoPagar(
-              id: c.id,
-              name: c.name,
-              amount: c.amount,
-              date: c.date,
-              selected: false,
-              available: true,
-            ));
-          }
+        if (transaccion.concepto.isPaid) {
+          conceptosPagados.add(ConceptoPagar(
+            id: transaccion.concepto.id,
+            name: transaccion.concepto.name,
+            amount: transaccion.concepto.amount,
+            date: transaccion.fechaCreacion,
+            selected: true,
+            available: false,
+          ));
+        } else {
+          conceptosAPagar.add(ConceptoPagar(
+            id: transaccion.concepto.id,
+            name: transaccion.concepto.name,
+            amount: transaccion.concepto.amount,
+            date: transaccion.fechaCreacion,
+            selected: false,
+            available: true,
+          ));
         }
       }
     } else {
@@ -95,14 +95,42 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
     setState(() {});
   }
 
+  Future<void> _cargarTransaccionesImpagas() async {
+    TransaccionProvider transaccionProvider =
+        Provider.of<TransaccionProvider>(context, listen: false);
+    transaccionesAdeudadas = await transaccionProvider
+        .getTransaccionesUnpaidOld(widget.feriaId, widget.puesto);
+
+    if (transaccionesAdeudadas.isNotEmpty) {
+      for (var transaccion in transaccionesAdeudadas) {
+        conceptosAPagar.add(ConceptoPagar(
+          id: transaccion.concepto.id,
+          name: transaccion.concepto.name,
+          amount: transaccion.concepto.amount,
+          date: transaccion.fechaCreacion,
+          selected: false,
+          available: true,
+        ));
+      }
+    }
+
+    _calcularTotal();
+    setState(() {});
+  }
+
   void _calcularTotal() {
-    // Sumar los conceptos seleccionados por pagar
     total = 0;
     for (var concepto in conceptosAPagar) {
       if (concepto.selected) {
         total += concepto.amount;
       }
     }
+  }
+
+  bool isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
   }
 
   int _calcularDeuda() {
@@ -112,7 +140,6 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
         deuda += concepto.amount;
       }
     }
-    // Los conceptosPagados no afectan la deuda
     return deuda;
   }
 
@@ -146,12 +173,26 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                         puestoActualizado.apellidoResponsable;
                   });
                 }
+              } else if (value == 'Historial') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => HistorialPagosPage(
+                      feriaId: widget.feriaId,
+                      puesto: widget.puesto,
+                    ),
+                  ),
+                );
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'Editar',
                 child: Text('Editar datos del responsable'),
+              ),
+              const PopupMenuItem(
+                value: 'Historial',
+                child: Text('Ver historial de pagos'),
               ),
             ],
           ),
@@ -187,7 +228,9 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                       decoration: BoxDecoration(
                         color: concepto.selected
                             ? Colors.green[100]
-                            : Colors.grey[200],
+                            : !isSameDay(concepto.date, DateTime.now())
+                                ? Colors.red[100]
+                                : Colors.grey[200],
                         borderRadius: BorderRadius.circular(10.0),
                       ),
                       child: CheckboxListTile(
@@ -201,7 +244,7 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                               style: TextStyle(
                                 fontWeight: FontWeight.w500,
                                 color: concepto.selected
-                                    ? Colors.green
+                                    ? const Color.fromARGB(255, 18, 74, 21)
                                     : Colors.black,
                               ),
                             ),
@@ -209,7 +252,13 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                               'Fecha: ${_formatDate(concepto.date)}',
                               style: TextStyle(
                                 fontSize: 14.0,
-                                color: Colors.grey[600],
+                                color: !isSameDay(concepto.date, DateTime.now())
+                                    ? Colors.red[800]
+                                    : Colors.grey[600],
+                                fontWeight:
+                                    !isSameDay(concepto.date, DateTime.now())
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                               ),
                             ),
                           ],
@@ -229,17 +278,14 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                             fontSize: 14.0,
                           ),
                         ),
-                        activeColor: Colors.blue,
+                        activeColor: const Color.fromARGB(255, 8, 125, 14),
                         checkColor: Colors.white,
                         controlAffinity: ListTileControlAffinity.leading,
                         tileColor: Colors.transparent,
                       ),
                     );
                   }),
-
                   const SizedBox(height: 16.0),
-
-                  // Nueva sección de Conceptos Pagados
                   if (conceptosPagados.isNotEmpty) ...[
                     const Text(
                       'Conceptos Pagados',
@@ -358,6 +404,10 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                       return;
                     }
 
+                    print("************************");
+                    print("******** CONFIRMAR ********");
+                    print("************************");
+
                     TransaccionProvider transaccionProvider =
                         Provider.of<TransaccionProvider>(context,
                             listen: false);
@@ -369,10 +419,19 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
 
                     print("******** SELECCIONADOS ********");
 
+                    // print(
+                    //     transaccionesActuales.map((t) => t.toJson()).toList());
+
                     for (var conceptoSeleccionado in conceptosSeleccionados) {
                       // check if exists in transaccionesActuales
-                      bool exists = transaccionesActuales.any((t) => t.conceptos
-                          .any((c) => c.id == conceptoSeleccionado.id));
+                      bool exists = transaccionesActuales
+                          .any((t) => t.concepto.id == conceptoSeleccionado.id);
+
+                      // busco tambien si existe en transaccionesAdeudadas
+                      if (!exists) {
+                        exists = transaccionesAdeudadas.any(
+                            (t) => t.concepto.id == conceptoSeleccionado.id);
+                      }
 
                       print(conceptoSeleccionado.name);
                       if (exists) {
@@ -407,14 +466,36 @@ class _DetallePuestoPageState extends State<DetallePuestoPage> {
                     for (var conceptoNoSeleccionado
                         in conceptosNoSeleccionados) {
                       print(conceptoNoSeleccionado.name);
-                      await transaccionProvider.agregarTransaccion(
-                        widget.feriaId,
-                        widget.puesto.id,
-                        conceptoNoSeleccionado.name,
-                        conceptoNoSeleccionado.amount,
-                        false,
-                        conceptoNoSeleccionado.date,
-                      );
+
+                      bool exists = transaccionesActuales.any(
+                          (t) => t.concepto.id == conceptoNoSeleccionado.id);
+
+                      // busco tambien si existe en transaccionesAdeudadas
+                      if (!exists) {
+                        exists = transaccionesAdeudadas.any(
+                            (t) => t.concepto.id == conceptoNoSeleccionado.id);
+                      }
+
+                      if (exists) {
+                        print(" ***** EDITAR *****");
+                        await transaccionProvider.actualizarTransaccion(
+                            widget.feriaId,
+                            widget.puesto.id,
+                            conceptoNoSeleccionado.id,
+                            false);
+                      } else {
+                        print(" ***** NUEVO *****");
+                        await transaccionProvider.agregarTransaccion(
+                          widget.feriaId,
+                          widget.puesto.id,
+                          conceptoNoSeleccionado.name,
+                          conceptoNoSeleccionado.amount,
+                          false,
+                          conceptoNoSeleccionado.date,
+                        );
+                      }
+
+                      hayCambios = true;
                     }
 
                     if (hayCambios) {
